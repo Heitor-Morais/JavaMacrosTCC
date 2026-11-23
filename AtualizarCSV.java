@@ -1,8 +1,10 @@
 // Simcenter STAR-CCM+ macro: AtualizarCSV.java
 // Abra o .sim JA RESOLVIDO de uma asa (ex.: SimulationBatches\Asa_Dianteira_V.10\Asa_Dianteira_V.10.sim)
-// e rode esta macro. Ela le o historico dos monitores de Lift e Drag e preenche, na linha
-// dessa asa em resumo.csv, as colunas drag_ultimo_N, downforce_ultimo_N, osc_drag_pct e
-// osc_lift_pct, com o mesmo criterio do BatchAsas (amostras a cada 10 iteracoes, ultimas 100).
+// e rode esta macro. Ela le o historico dos monitores de Lift e Drag e, com o mesmo criterio
+// do BatchAsas (amostras a cada 10 iteracoes, ultimas 100), calcula a media e a oscilacao
+// das forcas na janela final. A media das ultimas 100 iteracoes, que e o valor comparado
+// com a macro, e mostrada na mensagem de execucao. Na linha dessa asa em resumo.csv, a
+// macro preenche as colunas drag_ultimo_N, downforce_ultimo_N, osc_drag_pct e osc_lift_pct.
 // Nao roda o solver e nao altera o .sim.
 package macro;
 
