@@ -4,7 +4,8 @@
 // do BatchAsas (amostras a cada 10 iteracoes, ultimas 100), calcula a media e a oscilacao
 // das forcas na janela final. A media das ultimas 100 iteracoes, que e o valor comparado
 // com a macro, e mostrada na mensagem de execucao. Na linha dessa asa em resumo.csv, a
-// macro preenche as colunas drag_ultimo_N, downforce_ultimo_N, osc_drag_pct e osc_lift_pct.
+// macro grava a media em drag_meio_N, lift_meio_N, drag_N, downforce_N e eficiencia, e
+// preenche as colunas drag_ultimo_N, downforce_ultimo_N, osc_drag_pct e osc_lift_pct.
 // Nao roda o solver e nao altera o .sim.
 package macro;
 
@@ -49,10 +50,19 @@ public class AtualizarCSV extends StarMacro {
       File f = new File(RESUMO);
       List<String> linhas = new ArrayList<>(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
       String novos = String.join(",", fmt(dragUlt), fmt(dfUlt), fmt(oscDrag), fmt(oscLift));
+      double dragMed = media(amDrag) * FATOR_SIMETRIA;
+      double dfMed = -media(amLift) * FATOR_SIMETRIA;
+      String medias = String.join(",", fmt(media(amDrag)), fmt(media(amLift)), fmt(dragMed), fmt(dfMed),
+          fmt(dragMed != 0 ? dfMed / dragMed : Double.NaN));
       boolean achou = false;
       for (int i = 0; i < linhas.size(); i++) {
         String l = linhas.get(i);
         if (l.startsWith(nome + ",")) {
+          // Colunas 6 a 10 (drag_meio_N ... eficiencia): media da janela final.
+          String[] c = l.split(",", 11);
+          if (c.length == 11) {
+            l = String.join(",", c[0], c[1], c[2], c[3], c[4], medias, c[10]);
+          }
           // As 4 ultimas colunas sao as que esta macro preenche: troca o que houver nelas.
           int corte = l.length();
           for (int k = 0; k < 4; k++) {
