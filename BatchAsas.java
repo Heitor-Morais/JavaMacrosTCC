@@ -174,7 +174,7 @@ public class BatchAsas extends StarMacro {
     }
     sim.saveState(new File(pasta, nome + ".sim").getPath());
 
-    // Ultima iteracao (mesmo criterio da linha Base_manual) e oscilacao na janela final
+    // Ultima iteracao e oscilacao na janela final (mesmas colunas da linha Base_manual)
     double[] ultimo = amostras.getLast();
     double total = (System.currentTimeMillis() - t0) / 1000.0;
     return String.join(",", nome, "ok", parada, String.valueOf(iteracoes), String.valueOf(celulas),
@@ -184,8 +184,9 @@ public class BatchAsas extends StarMacro {
         fmt(oscilacao(amostras, 1) * 100), fmt(oscilacao(amostras, 0) * 100));
   }
 
-  // Grava os valores da simulacao manual que ja vem resolvida no .sim base
-  // (ultima iteracao, sem media), para comparar com a mesma asa rodada pela macro.
+  // Grava os valores da simulacao manual que ja vem resolvida no .sim base, para comparar
+  // com a mesma asa rodada pela macro. Usa o mesmo criterio da macro: media das ultimas
+  // JANELA (100) iteracoes, amostradas a cada PASSO (10), lidas do historico dos monitores.
   void registrarBaseManual(File resumo) {
     try {
       int iter = sim.getSimulationIterator().getCurrentIteration();
@@ -198,18 +199,50 @@ public class BatchAsas extends StarMacro {
           return;
         }
       }
-      double liftMeio = sim.getReportManager().getReport(REPORT_LIFT).getReportMonitorValue();
-      double dragMeio = sim.getReportManager().getReport(REPORT_DRAG).getReportMonitorValue();
+      List<double[]> amostras = amostrasDoHistorico();
+      double liftMeio = media(amostras, 0);
+      double dragMeio = media(amostras, 1);
+      double[] ultimo = amostras.get(0);
       double dragTotal = dragMeio * FATOR_SIMETRIA;
       double downforce = -liftMeio * FATOR_SIMETRIA;
       Vector3 cp = ((CenterOfLoadsReport) sim.getReportManager().getReport(REPORT_CP)).getNetLocation();
       long celulas = ((FvRepresentation) sim.getRepresentationManager().getObject("Volume Mesh")).getCellCount();
       escreverLinha(resumo, String.join(",", "Base_manual", "ok", "manual", String.valueOf(iter), String.valueOf(celulas),
           fmt(dragMeio), fmt(liftMeio), fmt(dragTotal), fmt(downforce), fmt(dragTotal != 0 ? downforce / dragTotal : Double.NaN),
-          fmt(cp.x), fmt(cp.y), fmt(cp.z), "", "", "", "", fmt(dragTotal), fmt(downforce), "", ""));
+          fmt(cp.x), fmt(cp.y), fmt(cp.z), "", "", "", "",
+          fmt(ultimo[1] * FATOR_SIMETRIA), fmt(-ultimo[0] * FATOR_SIMETRIA),
+          fmt(oscilacao(amostras, 1) * 100), fmt(oscilacao(amostras, 0) * 100)));
     } catch (Exception e) {
       sim.println("Nao foi possivel registrar a simulacao manual: " + e);
     }
+  }
+
+  // Amostras {lift, drag} a cada PASSO iteracoes nas ultimas JANELA do historico dos
+  // monitores, terminando na ultima iteracao (mesma amostragem do solver da macro e da
+  // AtualizarCSV). A primeira amostra da lista e a ultima iteracao.
+  List<double[]> amostrasDoHistorico() {
+    double[] lift = historicoMonitor(REPORT_LIFT);
+    double[] drag = historicoMonitor(REPORT_DRAG);
+    int len = Math.min(lift.length, drag.length);
+    int n = Math.min(JANELA / PASSO, (len + PASSO - 1) / PASSO);
+    List<double[]> amostras = new ArrayList<>();
+    for (int k = 0; k < n; k++) {
+      amostras.add(new double[] {lift[lift.length - 1 - k * PASSO], drag[drag.length - 1 - k * PASSO]});
+    }
+    return amostras;
+  }
+
+  double[] historicoMonitor(String report) {
+    for (Monitor m : sim.getMonitorManager().getMonitors()) {
+      if (m instanceof ReportMonitor
+          && ((ReportMonitor) m).getReport().getPresentationName().equals(report)) {
+        double[] y = ((ReportMonitor) m).getAllYValues();
+        if (y.length > 0) {
+          return y;
+        }
+      }
+    }
+    throw new RuntimeException("monitor do report '" + report + "' nao encontrado ou vazio");
   }
 
   // Importa o .x_t, junta todos os corpos numa peca e todas as superficies numa so.
